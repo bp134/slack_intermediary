@@ -9,6 +9,8 @@ app = Flask(__name__)
 # Initialize Slack Client
 slack_client = WebClient(token=os.environ.get("SLACK_BOT_TOKEN"))
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "openrouter/auto")
 DB_FILE = "history.db"
 
 def init_db():
@@ -48,6 +50,53 @@ def get_history(channel_id, limit=10):
         rows = cursor.fetchall()
         return [{"role": r, "content": c} for r, c in reversed(rows)]
 
+
+def get_openrouter_reply(messages):
+    """Returns a chat completion response from OpenRouter."""
+    if not OPENROUTER_API_KEY:
+        raise RuntimeError("OPENROUTER_API_KEY is not configured")
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": OPENROUTER_MODEL,
+        "messages": messages,
+    }
+
+    response = requests.post(
+        OPENROUTER_API_URL,
+        headers=headers,
+        json=payload,
+        timeout=30,
+    )
+
+    try:
+        response_data = response.json()
+    except ValueError as exc:
+        preview = response.text[:200].strip()
+        raise RuntimeError(
+            f"OpenRouter returned a non-JSON response "
+            f"(HTTP {response.status_code}): {preview or '<empty body>'}"
+        ) from exc
+
+    if not response.ok:
+        error = response_data.get("error")
+        if isinstance(error, dict):
+            message = error.get("message")
+        else:
+            message = error
+        message = message or response.text
+        raise RuntimeError(
+            f"OpenRouter request failed with HTTP {response.status_code}: {message}"
+        )
+
+    try:
+        return response_data["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise RuntimeError(f"Unexpected OpenRouter response: {response_data}") from exc
+
 # Initialize database on startup
 init_db()
 
@@ -71,26 +120,15 @@ def slack_events():
             # 2. Retrieve the last 10 messages for this specific channel
             history = get_history(channel_id, limit=10)
             
-            # 3. Construct payload with the full conversation history
-            headers = {
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json"
-            }
-            payload = {
-                "model": "https://openrouter.ai/openrouter/auto",
-                "messages": history
-            }
-            
+            # 3. Call OpenRouter with the full conversation history
             try:
-                response = requests.post("https://openrouter.ai", headers=headers, json=payload)
-                response.raise_for_status()
-                ai_response = response.json()["choices"]["message"]["content"]
+                ai_response = get_openrouter_reply(history)
                 
                 # 4. Save the bot's own response to memory
                 save_message(channel_id, "assistant", ai_response)
                 
             except Exception as e:
-                ai_response = f"Sorry, I encountered an error retrieving history: {str(e)}"
+                ai_response = f"Sorry, I encountered an error calling OpenRouter: {str(e)}"
             
             slack_client.chat_postMessage(channel=channel_id, text=ai_response)
             
