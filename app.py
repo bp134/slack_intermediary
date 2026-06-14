@@ -77,7 +77,7 @@ def slack_events():
                 "Content-Type": "application/json"
             }
             payload = {
-                "model": "meta-llama/llama-3-70b-instruct", 
+                "model": " ", 
                 "messages": history
             }
             
