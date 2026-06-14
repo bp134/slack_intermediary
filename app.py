@@ -77,7 +77,7 @@ def slack_events():
                 "Content-Type": "application/json"
             }
             payload = {
-                "model": " openrouter/auto"
+                "model": "https://openrouter.ai/openrouter/auto",
                 "messages": history
             }
             
