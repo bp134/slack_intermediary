@@ -1,20 +1,37 @@
-import os
-import json
 import logging
+import os
 
-DATA_PATH = "/data"
-MAP_FILE = os.path.join(DATA_PATH, "id_map.json")
-MASTER_CSV = os.path.join(DATA_PATH, "master_tasks.csv")
+from config import DATA_PATH, LOG_FILE, MAP_FILE, MASTER_CSV, MEMORY_ROOT
+from memory import purge_old_memory
+from storage import atomic_write_json
 
-def initialize_storage():
+
+def setup_logging() -> None:
+    logging.basicConfig(
+        filename=LOG_FILE,
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+    )
+    if os.path.exists(LOG_FILE):
+        os.chmod(LOG_FILE, 0o600)
+
+
+def initialize_storage() -> bool:
     if not os.path.exists(DATA_PATH):
-        logging.error("Persistent disk not found at /data.")
+        logging.error("Persistent disk not found at %s.", DATA_PATH)
         return False
+
+    os.makedirs(MEMORY_ROOT, exist_ok=True)
+
     if not os.path.exists(MAP_FILE):
-        with open(MAP_FILE, 'w') as f: json.dump({}, f)
+        atomic_write_json(MAP_FILE, {})
     if not os.path.exists(MASTER_CSV):
-        with open(MASTER_CSV, 'w') as f: 
+        with open(MASTER_CSV, "w", encoding="utf-8") as f:
             f.write("Date,Task,Patient_ID,Staff_Assigned,Status\n")
-    os.chmod(MAP_FILE, 0o600)
-    os.chmod(MASTER_CSV, 0o600)
+
+    for path in (MAP_FILE, MASTER_CSV):
+        os.chmod(path, 0o600)
+
+    setup_logging()
+    purge_old_memory()
     return True
