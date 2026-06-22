@@ -4,8 +4,9 @@ import re
 
 from filelock import FileLock
 from presidio_analyzer import AnalyzerEngine
+from presidio_analyzer.nlp_engine import NlpEngineProvider
 
-from config import MAP_FILE, PSEUDONYMIZE_ENTITIES
+from config import MAP_FILE, PSEUDONYMIZE_ENTITIES, SPACY_MODEL
 from storage import atomic_write_json
 
 _analyzer: AnalyzerEngine | None = None
@@ -14,7 +15,16 @@ _analyzer: AnalyzerEngine | None = None
 def _get_analyzer() -> AnalyzerEngine:
     global _analyzer
     if _analyzer is None:
-        _analyzer = AnalyzerEngine()
+        provider = NlpEngineProvider(
+            nlp_configuration={
+                "nlp_engine_name": "spacy",
+                "models": [{"lang_code": "en", "model_name": SPACY_MODEL}],
+            }
+        )
+        _analyzer = AnalyzerEngine(
+            nlp_engine=provider.create_engine(),
+            supported_languages=["en"],
+        )
     return _analyzer
 
 

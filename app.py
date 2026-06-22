@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
@@ -23,9 +24,18 @@ logger = logging.getLogger(__name__)
 
 app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
 
+HELP_TEXT = (
+    "I record tasks when messages mention follow-ups, owings, orders, deadlines, or updates. "
+    "Say `done` to complete the latest task in this channel, or `show master list` for the full list."
+)
+
+
+def _normalize_message(text: str) -> str:
+    return re.sub(r"<@[^>]+>", "", text).strip()
+
 
 def _is_completion_message(text: str) -> bool:
-    lower = text.lower().strip()
+    lower = _normalize_message(text).lower()
     return lower.startswith("done") or lower.startswith("completed")
 
 
@@ -44,8 +54,29 @@ def _reply_with_openrouter(channel: str, pseudo_text: str, client) -> None:
     client.chat_postMessage(channel=channel, text=reply_text)
 
 
+def _safe_pseudonymize(text: str) -> str:
+    try:
+        return pseudonymize_text(text)
+    except Exception as exc:
+        logger.error("action=pseudonymize_failed error=%s", exc)
+        return text
+
+
 @app.event("message")
 def handle_msg(event, client):
+    try:
+        _handle_msg(event, client)
+    except Exception as exc:
+        logger.exception("action=handler_failed error=%s", exc)
+        channel = event.get("channel")
+        if channel:
+            client.chat_postMessage(
+                channel=channel,
+                text="Sorry, something went wrong processing that message. Please try again.",
+            )
+
+
+def _handle_msg(event, client):
     if event.get("subtype") == "bot_message" or "bot_id" in event:
         return
 
@@ -57,9 +88,8 @@ def handle_msg(event, client):
     if not channel or not user:
         return
 
-    lower = text.lower()
-    pseudo_text = pseudonymize_text(text)
-    logger.info("action=message_received channel=%s user=%s text=%s", channel, user, pseudo_text)
+    normalized = _normalize_message(text)
+    lower = normalized.lower()
 
     if is_admin(user) and "emergency stop" in lower:
         set_paused(True)
@@ -77,6 +107,7 @@ def handle_msg(event, client):
         return
 
     if is_paused():
+        logger.info("action=message_skipped_paused channel=%s user=%s", channel, user)
         return
 
     if lower.strip() == "show master list":
@@ -92,6 +123,10 @@ def handle_msg(event, client):
         logger.info("action=master_list_sent user=%s", user)
         return
 
+    if lower.strip() in ("help", "neena help"):
+        client.chat_postMessage(channel=channel, text=HELP_TEXT)
+        return
+
     if _is_completion_message(text):
         task_id = mark_latest_open_task_done(channel)
         if task_id:
@@ -99,9 +134,16 @@ def handle_msg(event, client):
                 channel=channel,
                 text=f"Marked task {task_id} as done.",
             )
+        else:
+            client.chat_postMessage(
+                channel=channel,
+                text="No open task found in this channel to mark as done.",
+            )
         return
 
-    if looks_like_task(text):
+    if looks_like_task(normalized):
+        pseudo_text = _safe_pseudonymize(text)
+        logger.info("action=message_received channel=%s user=%s text=%s", channel, user, pseudo_text)
         summary, patient_ref, urgency = prepare_task_summary(text)
         task_id = add_task(
             channel_id=channel,
@@ -125,10 +167,13 @@ def handle_msg(event, client):
         return
 
     if llm_enabled():
+        pseudo_text = _safe_pseudonymize(text)
+        logger.info("action=message_received channel=%s user=%s text=%s", channel, user, pseudo_text)
         _reply_with_openrouter(channel, pseudo_text, client)
         return
 
-    logger.info("action=message_ignored channel=%s user=%s (LLM disabled)", channel, user)
+    logger.info("action=message_unrecognized channel=%s user=%s", channel, user)
+    client.chat_postMessage(channel=channel, text=HELP_TEXT)
 
 
 def _configure_startup_logging() -> None:

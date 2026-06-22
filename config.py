@@ -8,9 +8,11 @@ LOG_FILE = os.path.join(DATA_PATH, "bot_activity.log")
 PAUSE_FILE = os.path.join(DATA_PATH, "bot_paused")
 
 RETENTION_DAYS = int(os.environ.get("MEMORY_RETENTION_DAYS", "7"))
+SPACY_MODEL = os.environ.get("SPACY_MODEL", "en_core_web_sm")
 
 TASK_KEYWORDS = (
     "owing",
+    "owings",
     "follow up",
     "follow-up",
     "action",
@@ -21,6 +23,14 @@ TASK_KEYWORDS = (
     "need to",
     "needs to",
     "must",
+    "task",
+    "update",
+    "order",
+    "prescription",
+    "px",
+    "collect",
+    "delivery",
+    "repeat",
 )
 
 PSEUDONYMIZE_ENTITIES = (
