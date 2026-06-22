@@ -1,0 +1,4 @@
+# Optional — only needed for Excel audit export (utils.py). Not required to run the Slack bot.
+-r requirements.txt
+pandas==2.2.3
+openpyxl==3.1.2

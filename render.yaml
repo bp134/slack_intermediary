@@ -18,6 +18,8 @@ services:
       mountPath: /data
       sizeGB: 1
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
       - key: DATA_PATH
         value: /data
       - key: MASTER_LIST_ACCESS
