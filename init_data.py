@@ -2,7 +2,7 @@ import logging
 import os
 
 from config import DATA_PATH, LOG_FILE, MAP_FILE, MASTER_CSV, MEMORY_ROOT
-from memory import purge_old_memory
+from memory import init_db, purge_old_memory
 from storage import atomic_write_json
 
 
@@ -32,6 +32,7 @@ def initialize_storage() -> bool:
     for path in (MAP_FILE, MASTER_CSV):
         os.chmod(path, 0o600)
 
+    init_db()
     setup_logging()
     purge_old_memory()
     return True

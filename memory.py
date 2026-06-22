@@ -1,12 +1,52 @@
 import json
 import logging
 import os
+import sqlite3
 from datetime import datetime, timedelta, timezone
 
-from config import MASTER_CSV, MEMORY_ROOT, PAUSE_FILE, RETENTION_DAYS, TASK_KEYWORDS
+from config import DATA_PATH, MASTER_CSV, MEMORY_ROOT, PAUSE_FILE, RETENTION_DAYS, TASK_KEYWORDS
 from storage import atomic_write_json
 
 logger = logging.getLogger(__name__)
+
+DB_FILE = os.path.join(DATA_PATH, "history.db")
+
+
+def init_db() -> None:
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                channel_id TEXT,
+                role TEXT,
+                content TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+    os.chmod(DB_FILE, 0o600)
+
+
+def save_message(channel_id: str, role: str, content: str) -> None:
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO messages (channel_id, role, content) VALUES (?, ?, ?)",
+            (channel_id, role, content),
+        )
+        conn.commit()
+
+
+def get_history(channel_id: str, limit: int = 10) -> list[dict]:
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT role, content FROM messages WHERE channel_id = ? ORDER BY id DESC LIMIT ?",
+            (channel_id, limit),
+        )
+        rows = cursor.fetchall()
+        return [{"role": role, "content": content} for role, content in reversed(rows)]
 
 
 def is_paused() -> bool:
