@@ -4,7 +4,7 @@ import os
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
-from access import can_view_master_list, is_admin, validate_env
+from access import can_view_master_list, is_admin, llm_enabled, validate_env
 from init_data import initialize_storage
 from logic import prepare_task_summary, pseudonymize_text, translate_tasks_to_real_names
 from memory import (
@@ -124,16 +124,39 @@ def handle_msg(event, client):
         )
         return
 
-    _reply_with_openrouter(channel, pseudo_text, client)
+    if llm_enabled():
+        _reply_with_openrouter(channel, pseudo_text, client)
+        return
+
+    logger.info("action=message_ignored channel=%s user=%s (LLM disabled)", channel, user)
+
+
+def _configure_startup_logging() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=[logging.StreamHandler()],
+        force=True,
+    )
 
 
 if __name__ == "__main__":
+    _configure_startup_logging()
+
     missing = validate_env()
     if missing:
-        raise SystemExit(f"Missing required environment variables: {', '.join(missing)}")
+        logger.error("Missing required environment variables: %s", ", ".join(missing))
+        raise SystemExit(1)
+
+    from config import DATA_PATH
 
     if not initialize_storage():
-        raise SystemExit("Storage init failed.")
+        logger.error(
+            "Storage init failed. DATA_PATH=%s exists=%s",
+            DATA_PATH,
+            os.path.exists(DATA_PATH),
+        )
+        raise SystemExit(1)
 
-    logger.info("action=bot_started")
+    logger.info("action=bot_started data_path=%s llm_enabled=%s", DATA_PATH, llm_enabled())
     SocketModeHandler(app, os.environ.get("SLACK_APP_TOKEN")).start()

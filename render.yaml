@@ -28,6 +28,8 @@ services:
         value: "7"
       - key: OPENROUTER_MODEL
         value: openrouter/auto
+      - key: LLM_ENABLED
+        value: "false"
       - key: SLACK_BOT_TOKEN
         sync: false
       - key: SLACK_APP_TOKEN

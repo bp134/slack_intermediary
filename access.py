@@ -53,11 +53,17 @@ def can_view_master_list(user_id: str | None, client=None) -> bool:
     return _is_workspace_member(client, user_id)
 
 
+def llm_enabled() -> bool:
+    return os.environ.get("LLM_ENABLED", "false").lower() in ("1", "true", "yes")
+
+
 def validate_env() -> list[str]:
     missing = []
-    for key in ("SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "OPENROUTER_API_KEY"):
+    for key in ("SLACK_BOT_TOKEN", "SLACK_APP_TOKEN"):
         if not os.environ.get(key):
             missing.append(key)
     if not get_admin_user_id():
         missing.append("MY_SLACK_USER_ID")
+    if llm_enabled() and not os.environ.get("OPENROUTER_API_KEY"):
+        missing.append("OPENROUTER_API_KEY")
     return missing

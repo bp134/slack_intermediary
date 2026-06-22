@@ -7,13 +7,19 @@ from storage import atomic_write_json
 
 
 def setup_logging() -> None:
-    logging.basicConfig(
-        filename=LOG_FILE,
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-    )
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+
+    file_handler = logging.FileHandler(LOG_FILE)
+    file_handler.setFormatter(formatter)
+    root.addHandler(file_handler)
+
     if os.path.exists(LOG_FILE):
-        os.chmod(LOG_FILE, 0o600)
+        try:
+            os.chmod(LOG_FILE, 0o600)
+        except OSError:
+            logging.warning("Could not chmod log file %s", LOG_FILE)
 
 
 def initialize_storage() -> bool:
@@ -30,7 +36,10 @@ def initialize_storage() -> bool:
             f.write("Date,Task,Patient_ID,Staff_Assigned,Status\n")
 
     for path in (MAP_FILE, MASTER_CSV):
-        os.chmod(path, 0o600)
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            logging.warning("Could not chmod %s", path)
 
     init_db()
     setup_logging()
