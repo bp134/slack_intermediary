@@ -1,0 +1,36 @@
+# Render Blueprint — Neena Slack bot (Socket Mode background worker)
+# https://render.com/docs/blueprint-spec
+#
+# Deploy: Dashboard → Blueprints → New Blueprint Instance → select this repo.
+# On first sync, Render prompts for secret env vars (sync: false).
+# Python version is read from python_version (3.14.4).
+
+services:
+  - type: worker
+    name: neena-slack-bot
+    runtime: python
+    plan: starter # persistent disk requires a paid plan
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt && python -m spacy download en_core_web_lg
+    startCommand: python app.py
+    disk:
+      name: neena-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DATA_PATH
+        value: /data
+      - key: MASTER_LIST_ACCESS
+        value: workspace
+      - key: MEMORY_RETENTION_DAYS
+        value: "7"
+      - key: OPENROUTER_MODEL
+        value: openrouter/auto
+      - key: SLACK_BOT_TOKEN
+        sync: false
+      - key: SLACK_APP_TOKEN
+        sync: false
+      - key: MY_SLACK_USER_ID
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
