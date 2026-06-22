@@ -1,5 +1,5 @@
 slack-bolt==1.22.0
-slack_sdk==3.31.0
+slack_sdk==3.34.0
 requests==2.32.3
 presidio-analyzer==2.2.355
 presidio-anonymizer==2.2.355
