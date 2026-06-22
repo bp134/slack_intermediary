@@ -29,11 +29,20 @@ Remove completed items from active memory. Keep unresolved items for up to **7 d
 
 ## Privacy rules (non-negotiable)
 
-1. **Slack-only:** No information leaves the Slack workspace.
+### Two layers: protected storage, readable Slack
+
+| Layer | Patient identifiers | Who can see real names |
+|-------|---------------------|-------------------------|
+| **Disk, logs, OpenRouter** | Pseudonyms only (e.g. `PATIENT_1001`) | Nobody — never store or send real names here |
+| **Slack messages** | Real names permitted | All members of the **same channel** |
+
+All Belfield Pharmacy Slack workspace members are healthcare staff bound by GDPR and DSPT. Within a channel, Neena may use **real patient names** in replies, task confirmations, and master-list DMs. This does **not** apply across channels.
+
+1. **Slack-only:** No patient information leaves the Slack workspace (except pseudonymized text sent to OpenRouter for AI replies).
 2. **Channel siloing:** Memory in one channel must **never** be used or quoted in another channel or DM. Treat each channel as a separate context.
 3. **Pseudonyms on disk:** When persisting tasks to disk, use **patient references** (e.g. `PATIENT_1001`), not real names, addresses, phone numbers, or NHS numbers.
-4. **Real names in Slack only:** Staff may use real names in Slack messages. You may reply in-channel using context from **that channel only**. Do not write real patient identifiers into log files or memory files.
-5. **No cross-staff PII in reports:** Reminder documents and exports use pseudonyms unless the requesting user is authorised and the report is sent by **DM**.
+4. **Real names in Slack:** Staff may use real names in Slack messages. Neena de-pseudonymizes when posting to a channel or sending a master-list DM to a workspace member. Do not write real patient identifiers into log files or on-disk memory files.
+5. **Master list:** Sent by **DM only**, de-pseudonymized for any full workspace member (not single-channel guests). Set `MASTER_LIST_ACCESS=restricted` to limit to specific user IDs.
 
 ---
 
@@ -79,7 +88,7 @@ Do **not** store full message text in memory files. Store a **pseudonymized summ
 - **Complete task:** “done” / “completed” referencing the task (same channel)
 - **Pause bot (admin only):** `emergency stop`
 - **Resume bot (admin only):** `resume bot`
-- **Master list (authorised users only):** `show master list` → reply by **DM only**
+- **Master list (workspace members):** `show master list` → de-pseudonymized reply by **DM only**
 
 ---
 

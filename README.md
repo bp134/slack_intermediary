@@ -40,3 +40,5 @@ python app.py
 ```
 
 Requires Socket Mode: `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `MY_SLACK_USER_ID`, and `OPENROUTER_API_KEY`.
+
+Slack bot scopes: `chat:write`, `channels:history`, `groups:history`, `im:history`, `im:write`, `users:read`.

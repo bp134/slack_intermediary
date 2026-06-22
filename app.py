@@ -80,14 +80,15 @@ def handle_msg(event, client):
         return
 
     if lower.strip() == "show master list":
-        if not can_view_master_list(user):
+        if not can_view_master_list(user, client):
             client.chat_postMessage(
                 channel=channel,
-                text="You are not authorised to view the master list.",
+                text="The master list is only available to full workspace members.",
             )
             logger.warning("action=master_list_denied user=%s", user)
             return
-        client.chat_postMessage(channel=user, text=f"```\n{read_master_csv()}\n```")
+        master_list = translate_tasks_to_real_names(read_master_csv())
+        client.chat_postMessage(channel=user, text=f"```\n{master_list}\n```")
         logger.info("action=master_list_sent user=%s", user)
         return
 
@@ -109,6 +110,11 @@ def handle_msg(event, client):
             source_ts=ts,
             patient_ref=patient_ref,
             urgency=urgency,
+        )
+        display_summary = translate_tasks_to_real_names(summary)
+        client.chat_postMessage(
+            channel=channel,
+            text=f"Recorded task `{task_id}` ({urgency} priority): {display_summary}",
         )
         logger.info(
             "action=message_processed channel=%s user=%s task=%s",

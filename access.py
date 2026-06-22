@@ -1,4 +1,7 @@
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 
 def get_admin_user_id() -> str | None:
@@ -21,10 +24,33 @@ def is_admin(user_id: str | None) -> bool:
     return bool(admin and user_id == admin)
 
 
-def can_view_master_list(user_id: str | None) -> bool:
+def _is_workspace_member(client, user_id: str) -> bool:
+    try:
+        result = client.users_info(user=user_id)
+        user = result["user"]
+    except Exception as exc:
+        logger.warning("action=users_info_failed user=%s error=%s", user_id, exc)
+        return False
+
+    if user.get("is_bot") or user.get("deleted"):
+        return False
+    if user.get("is_restricted") or user.get("is_ultra_restricted"):
+        return False
+    return True
+
+
+def can_view_master_list(user_id: str | None, client=None) -> bool:
     if not user_id:
         return False
-    return user_id in get_authorized_user_ids()
+
+    access_mode = os.environ.get("MASTER_LIST_ACCESS", "workspace").lower()
+    if access_mode == "restricted":
+        return user_id in get_authorized_user_ids()
+
+    if client is None:
+        return True
+
+    return _is_workspace_member(client, user_id)
 
 
 def validate_env() -> list[str]:
