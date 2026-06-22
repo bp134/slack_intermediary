@@ -5,13 +5,13 @@ Channel-scoped, pseudonymized task memory for Slack.
 ## Setup
 
 ```bash
-cd slack-bot
+cd slack_intermediary
 python -m venv .venv
 .venv\Scripts\activate   # Windows
 pip install -r requirements.txt
 python -m spacy download en_core_web_lg   # required by Presidio
 cp .env.example .env
-# Edit .env with Slack tokens and user IDs
+# Edit .env with Slack tokens, OpenRouter key, and user IDs
 ```
 
 For local dev without `/data`:
@@ -25,10 +25,13 @@ python app.py
 
 | File | Purpose |
 |------|---------|
-| `Memory.md` | Memory & privacy rules for the LLM |
-| `docs/Hard_Limits.md` | Non-negotiable boundaries |
-| `docs/AI_AGENT.md` | Daily workflow |
-| `docs/MEMORY_DESIGN.md` | Technical architecture |
+| `Memory.md` | Memory and privacy rules for the LLM |
+| `Hard Limits.md` | Non-negotiable boundaries |
+| `AI_AGENT.md` | Daily workflow |
+| `SOUL.md` | Agent identity |
+| `USER.md` | Owner context |
+| `HEARTBEAT.md` | Active monitoring reminders |
+| `#Memory AI Agent/` | Constitution and operational boundaries |
 
 ## Run
 
@@ -36,4 +39,4 @@ python app.py
 python app.py
 ```
 
-Requires Socket Mode: `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `MY_SLACK_USER_ID`.
+Requires Socket Mode: `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `MY_SLACK_USER_ID`, and `OPENROUTER_API_KEY`.

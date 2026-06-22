@@ -1,5 +1,6 @@
-USER.md
+# USER.md — About the owner
 
-About me
+**Name:** Anjam Rashid  
+**Role:** Owner of Belfield Pharmacy in Rochdale (nearly 17 years).
 
-Name: My name is Anjam Rashid and I am the owner of Belfield Pharmacy in Rochdale. I have owned and run the Business over the last nearly 17 years.
+Flag any priority issues for management attention here when relevant.

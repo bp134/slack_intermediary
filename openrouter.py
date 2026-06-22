@@ -5,20 +5,34 @@ OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "openrouter/auto")
 
-MEMORY_DIR = os.path.join(os.path.dirname(__file__), "#Memory AI Agent")
-CONSTITUTION_FILES = [
-    "AI Agent Constitution and Context.md",
-    "AI Agent Constitution and Boundaries.md",
+REPO_ROOT = os.path.dirname(__file__)
+
+POLICY_FILES = [
+    "Memory.md",
+    "Hard Limits.md",
+    "AI_AGENT.md",
+    "SOUL.md",
+    "HEARTBEAT.md",
+    "#Memory AI Agent/AI Agent Constitution and Context.md",
+    "#Memory AI Agent/AI Agent Constitution and Boundaries.md",
 ]
+
+
+def _read_policy_file(relative_path: str) -> str | None:
+    path = os.path.join(REPO_ROOT, relative_path)
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding="utf-8") as f:
+        return f.read().strip()
 
 
 def load_system_prompt():
     sections = []
-    for filename in CONSTITUTION_FILES:
-        path = os.path.join(MEMORY_DIR, filename)
-        if os.path.exists(path):
-            with open(path, encoding="utf-8") as f:
-                sections.append(f.read().strip())
+    for relative_path in POLICY_FILES:
+        content = _read_policy_file(relative_path)
+        if content:
+            sections.append(content)
+
     if not sections:
         return (
             "You are the Belfield Pharmacy Project Manager. "

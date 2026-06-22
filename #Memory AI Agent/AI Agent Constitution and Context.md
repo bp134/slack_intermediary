@@ -25,7 +25,7 @@
 | Patient/Ref | Action Required | Responsible Staff | Deadline/Interval |
 | :--- | :--- | :--- | :--- |
 | Mr AB (22 Other Ln) | Follow up on Px order | Staff A | 2 days |
-| Mrs BC (9 High Cl) | Fulfill 24x Methotrexate 2.5mg | Staff B | 24 hours |
+| Mrs BC (9 High Cl) | Fulfil 24x Methotrexate 2.5mg | Staff B | 24 hours |
 
 ## REPETITIVE TASKS
 - [Task Description] | [Interval] | [Trigger/Notification]

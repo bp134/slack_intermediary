@@ -1,7 +1,7 @@
 # BELFIELD PHARMACY: AI PROJECT MANAGER MEMORY
 
 ## 1. CONSTITUTION & BOUNDARIES
-(As defined previously: Professional tone, inward-facing only, PII protection, no unauthorized workflow changes, 3-tier confidence model.)
+(As defined previously: Professional tone, inward-facing only, PII protection, no unauthorised workflow changes, 3-tier confidence model.)
 
 ## 2. RECURRING OPERATIONAL TASKS (Stage 1)
 | Task Name | Frequency | Target Role | Trigger Time |

@@ -29,7 +29,7 @@ def can_view_master_list(user_id: str | None) -> bool:
 
 def validate_env() -> list[str]:
     missing = []
-    for key in ("SLACK_BOT_TOKEN", "SLACK_APP_TOKEN"):
+    for key in ("SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "OPENROUTER_API_KEY"):
         if not os.environ.get(key):
             missing.append(key)
     if not get_admin_user_id():
