@@ -1,138 +1,133 @@
+import logging
 import os
-import sqlite3
-import requests
-from flask import Flask, request, jsonify
-from slack_sdk import WebClient
 
-app = Flask(__name__)
+from slack_bolt import App
+from slack_bolt.adapter.socket_mode import SocketModeHandler
 
-# Initialize Slack Client
-slack_client = WebClient(token=os.environ.get("SLACK_BOT_TOKEN"))
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
-OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "openrouter/auto")
-DB_FILE = "history.db"
+from access import can_view_master_list, is_admin, validate_env
+from init_data import initialize_storage
+from logic import prepare_task_summary, pseudonymize_text, translate_tasks_to_real_names
+from memory import (
+    add_task,
+    get_history,
+    is_paused,
+    looks_like_task,
+    mark_latest_open_task_done,
+    read_master_csv,
+    save_message,
+    set_paused,
+)
+from openrouter import get_openrouter_reply
 
-def init_db():
-    """Creates the history table if it does not exist."""
-    with sqlite3.connect(DB_FILE) as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                channel_id TEXT,
-                role TEXT,
-                content TEXT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+logger = logging.getLogger(__name__)
+
+app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
+
+
+def _is_completion_message(text: str) -> bool:
+    lower = text.lower().strip()
+    return lower.startswith("done") or lower.startswith("completed")
+
+
+def _reply_with_openrouter(channel: str, pseudo_text: str, client) -> None:
+    save_message(channel, "user", pseudo_text)
+    history = get_history(channel, limit=10)
+
+    try:
+        ai_response = get_openrouter_reply(history)
+        save_message(channel, "assistant", ai_response)
+        reply_text = translate_tasks_to_real_names(ai_response)
+    except Exception as exc:
+        logger.error("OpenRouter error: %s", exc)
+        reply_text = f"Sorry, I encountered an error calling OpenRouter: {exc}"
+
+    client.chat_postMessage(channel=channel, text=reply_text)
+
+
+@app.event("message")
+def handle_msg(event, client):
+    if event.get("subtype") == "bot_message" or "bot_id" in event:
+        return
+
+    user = event.get("user")
+    channel = event.get("channel")
+    text = event.get("text", "")
+    ts = event.get("ts", "")
+
+    if not channel or not user:
+        return
+
+    lower = text.lower()
+    pseudo_text = pseudonymize_text(text)
+    logger.info("action=message_received channel=%s user=%s text=%s", channel, user, pseudo_text)
+
+    if is_admin(user) and "emergency stop" in lower:
+        set_paused(True)
+        logger.critical("action=bot_paused user=%s", user)
+        client.chat_postMessage(
+            channel=channel,
+            text="Bot paused. Admin can send `resume bot` to continue.",
+        )
+        return
+
+    if is_admin(user) and "resume bot" in lower:
+        set_paused(False)
+        logger.info("action=bot_resumed user=%s", user)
+        client.chat_postMessage(channel=channel, text="Bot resumed.")
+        return
+
+    if is_paused():
+        return
+
+    if lower.strip() == "show master list":
+        if not can_view_master_list(user):
+            client.chat_postMessage(
+                channel=channel,
+                text="You are not authorised to view the master list.",
             )
-        """)
-        conn.commit()
+            logger.warning("action=master_list_denied user=%s", user)
+            return
+        client.chat_postMessage(channel=user, text=f"```\n{read_master_csv()}\n```")
+        logger.info("action=master_list_sent user=%s", user)
+        return
 
-def save_message(channel_id, role, content):
-    """Saves a user or assistant message to the database."""
-    with sqlite3.connect(DB_FILE) as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO messages (channel_id, role, content) VALUES (?, ?, ?)",
-            (channel_id, role, content)
+    if _is_completion_message(text):
+        task_id = mark_latest_open_task_done(channel)
+        if task_id:
+            client.chat_postMessage(
+                channel=channel,
+                text=f"Marked task {task_id} as done.",
+            )
+        return
+
+    if looks_like_task(text):
+        summary, patient_ref, urgency = prepare_task_summary(text)
+        task_id = add_task(
+            channel_id=channel,
+            staff_user_id=user,
+            summary=summary,
+            source_ts=ts,
+            patient_ref=patient_ref,
+            urgency=urgency,
         )
-        conn.commit()
-
-def get_history(channel_id, limit=10):
-    """Retrieves the recent chat history for a specific Slack channel."""
-    with sqlite3.connect(DB_FILE) as conn:
-        cursor = conn.cursor()
-        # Fetch latest messages first, then reverse them to chronological order
-        cursor.execute(
-            "SELECT role, content FROM messages WHERE channel_id = ? ORDER BY id DESC LIMIT ?",
-            (channel_id, limit)
+        logger.info(
+            "action=message_processed channel=%s user=%s task=%s",
+            channel,
+            user,
+            task_id,
         )
-        rows = cursor.fetchall()
-        return [{"role": r, "content": c} for r, c in reversed(rows)]
+        return
 
+    _reply_with_openrouter(channel, pseudo_text, client)
 
-def get_openrouter_reply(messages):
-    """Returns a chat completion response from OpenRouter."""
-    if not OPENROUTER_API_KEY:
-        raise RuntimeError("OPENROUTER_API_KEY is not configured")
-
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": OPENROUTER_MODEL,
-        "messages": messages,
-    }
-
-    response = requests.post(
-        OPENROUTER_API_URL,
-        headers=headers,
-        json=payload,
-        timeout=30,
-    )
-
-    try:
-        response_data = response.json()
-    except ValueError as exc:
-        preview = response.text[:200].strip()
-        raise RuntimeError(
-            f"OpenRouter returned a non-JSON response "
-            f"(HTTP {response.status_code}): {preview or '<empty body>'}"
-        ) from exc
-
-    if not response.ok:
-        error = response_data.get("error")
-        if isinstance(error, dict):
-            message = error.get("message")
-        else:
-            message = error
-        message = message or response.text
-        raise RuntimeError(
-            f"OpenRouter request failed with HTTP {response.status_code}: {message}"
-        )
-
-    try:
-        return response_data["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise RuntimeError(f"Unexpected OpenRouter response: {response_data}") from exc
-
-# Initialize database on startup
-init_db()
-
-@app.route("/slack/events", methods=["POST"])
-def slack_events():
-    data = request.json
-    
-    if "challenge" in data:
-        return jsonify({"challenge": data["challenge"]})
-    
-    if "event" in data:
-        event = data["event"]
-        
-        if event.get("bot_id") is None and "text" in event:
-            user_text = event["text"]
-            channel_id = event["channel"]
-            
-            # 1. Save the incoming user message to memory
-            save_message(channel_id, "user", user_text)
-            
-            # 2. Retrieve the last 10 messages for this specific channel
-            history = get_history(channel_id, limit=10)
-            
-            # 3. Call OpenRouter with the full conversation history
-            try:
-                ai_response = get_openrouter_reply(history)
-                
-                # 4. Save the bot's own response to memory
-                save_message(channel_id, "assistant", ai_response)
-                
-            except Exception as e:
-                ai_response = f"Sorry, I encountered an error calling OpenRouter: {str(e)}"
-            
-            slack_client.chat_postMessage(channel=channel_id, text=ai_response)
-            
-    return jsonify({"status": "ok"})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    missing = validate_env()
+    if missing:
+        raise SystemExit(f"Missing required environment variables: {', '.join(missing)}")
+
+    if not initialize_storage():
+        raise SystemExit("Storage init failed.")
+
+    logger.info("action=bot_started")
+    SocketModeHandler(app, os.environ.get("SLACK_APP_TOKEN")).start()
