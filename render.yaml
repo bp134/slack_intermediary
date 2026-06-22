@@ -3,7 +3,7 @@
 #
 # Deploy: Dashboard → Blueprints → New Blueprint Instance → select this repo.
 # On first sync, Render prompts for secret env vars (sync: false).
-# Python version is read from python_version (3.14.4).
+# Python version is read from python_version (3.12.8).
 
 services:
   - type: worker
