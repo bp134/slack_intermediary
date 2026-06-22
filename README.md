@@ -9,7 +9,6 @@ cd slack_intermediary
 python -m venv .venv
 .venv\Scripts\activate   # Windows
 pip install -r requirements.txt
-python -m spacy download en_core_web_lg   # required by Presidio
 cp .env.example .env
 # Edit .env with Slack tokens, OpenRouter key, and user IDs
 ```
@@ -47,7 +46,7 @@ Slack bot scopes: `chat:write`, `channels:history`, `groups:history`, `im:histor
 
 - **Service type:** Background Worker (not Web Service)
 - **Python:** `3.12.8` via `python_version` / `PYTHON_VERSION` — do **not** set `3.14` in the dashboard
-- **Build:** `pip install -r requirements.txt && python -m spacy download en_core_web_lg`
+- **Build:** `pip install --upgrade pip && pip install -r requirements.txt`
 - **Start:** `python app.py`
 - **Disk:** mount at `/data`, set `DATA_PATH=/data`
 
