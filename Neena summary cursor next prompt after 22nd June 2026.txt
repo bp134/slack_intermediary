@@ -1,0 +1,98 @@
+## Neena Slack Bot — Session Summary (copy from here)
+
+### Project
+**Repo:** `slack_intermediary` (GitHub: `bp134/slack_intermediary`, branch `main`)  
+**Purpose:** Belfield Pharmacy Slack bot (“Neena”) — channel-scoped task memory, PII pseudonymization on disk, Socket Mode (no HTTP).
+
+---
+
+### What’s built and working
+
+**Core bot (Python + slack-bolt, Socket Mode)**
+- Detects tasks from keywords (follow up, owing, order, task, update, urgent, etc.)
+- Pseudonymizes PII before saving (Presidio + spaCy `en_core_web_sm`)
+- Confirms tasks in-channel with real names; stores pseudonyms on disk
+- `done` / `completed` marks latest open task in channel
+- `show master list` → DM to full workspace members, de-pseudonymized
+- Admin: `emergency stop` / `resume bot`
+- `help` when LLM is off
+- Per-channel JSON memory + `master_tasks.csv` + SQLite `history.db` on `/data`
+
+**Privacy model**
+- **Disk/logs/OpenRouter:** pseudonyms only  
+- **Slack (in-channel + master list DM):** real names for workspace staff (GDPR/DSPT aligned)
+
+**Deployment (Render)**
+- **Background Worker** (not Web Service)
+- **Python 3.12.8** (`python_version` / `PYTHON_VERSION`)
+- **Persistent disk** at `/data`, **`DATA_PATH=/data`**
+- **Build:** `pip install --upgrade pip && pip install -r requirements.txt`
+- **Start:** `python app.py`
+- **`render.yaml`** in repo (Blueprint optional; service was set up manually)
+
+**Required env vars**
+- `SLACK_BOT_TOKEN` (`xoxb-`)
+- `SLACK_APP_TOKEN` (`xapp-`, `connections:write`)
+- `MY_SLACK_USER_ID`
+- `DATA_PATH=/data`
+- `LLM_ENABLED=false` (default — task-only mode)
+- `OPENROUTER_API_KEY` only if `LLM_ENABLED=true`
+
+**Slack scopes:** `chat:write`, `channels:history`, `groups:history`, `im:history`, `im:write`, `users:read`
+
+**Status:** Deployed and **working** — task capture, confirmations, master list tested successfully.
+
+---
+
+### Fixes applied during setup
+- Renamed `Hard Limits.md.md` → `Hard Limits.md`; doc/spelling cleanup
+- Merged branches to `main`; removed `pandas` from core deps (optional `requirements-export.txt`)
+- Python 3.14 → **3.12.8** (pandas/build issues)
+- `slack_sdk` 3.34.0 for slack-bolt compatibility
+- spaCy model via pip wheel; explicit `click` dependency
+- `invalid_auth` → correct `xoxb` / `xapp` tokens
+- Silent replies → broader keywords, help text, error handling, lighter spaCy model
+
+---
+
+### Parked for later (not in scope now)
+- Local LLM / vLLM / llama.cpp (Ollama discouraged for privacy governance)
+- RAG knowledge base
+- MCP tool servers
+- 70B models — **not needed**; 8B + RAG would suffice when LLM is added
+
+---
+
+### Suggested pilot (2–4 weeks before Phase 2)
+- Use **one Slack channel** for real tasks
+- Weekly check of master list
+- Confirm Render stability and `/data` persistence across deploys
+- Move on when staff trust the task log
+
+---
+
+### Phase 2 (when pilot is solid) — priority order
+1. **Working-hours gate** (Mon–Sat hours in `Memory.md`)
+2. **Deadline parsing + proactive reminders**
+3. **Twice-daily reports** (constitution mentions these)
+4. **Optional LLM** (`LLM_ENABLED=true` or local model later)
+
+**Other improvements considered:** @mention-only replies, Excel export wiring (`utils.py`), tests, `/data` backups, monitoring.
+
+---
+
+### Key files
+- `app.py` — message handler  
+- `logic.py` — Presidio pseudonymization  
+- `memory.py` — tasks, CSV, SQLite  
+- `config.py` — keywords, paths  
+- `access.py` — admin, master list access  
+- `Memory.md`, `Hard Limits.md` — policy docs  
+- `render.yaml`, `requirements.txt`, `.env.example`
+
+---
+
+### To continue in a new chat
+Say: *“Continue Neena Slack bot from the session summary — we’re in pilot on Render, task-only mode (`LLM_ENABLED=false`), core working. Next: [working hours / reminders / etc.].”*
+
+Paste any Render log errors or Slack test failures if something breaks.
